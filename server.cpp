@@ -30,10 +30,17 @@ Server::Server(QObject *parent) :
 
     connect(socket, SIGNAL(readyRead()), this, SLOT(read()));
     connect(systemSocket, SIGNAL(readyRead()), this, SLOT(systemReading()));
-    connect(this, SIGNAL(systemReceived(QByteArray)), this, SLOT(answersChecker(QByteArray)));
-    connect(this, SIGNAL(systemReceived(QStringList, QHostAddress, quint16)), this, SLOT(handshake(QStringList,QHostAddress,quint16)));
     connect(this, SIGNAL(isReceived(QByteArray)), this, SLOT(sendReceived(QByteArray)));
+    connect(this, SIGNAL(handshakeReceived(QStringList, QHostAddress, quint16)), this, SLOT(handshake(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(registrationReceived(QStringList,QHostAddress,quint16)), this, SLOT(registration(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryReceived(QStringList,QHostAddress,quint16)), this,SLOT(recovery(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(existNicknameReceived(QString,QHostAddress,quint16)), this, SLOT(checkingNickname(QString,QHostAddress,quint16)));
+    connect(this, SIGNAL(existEmailReceived(QString,QHostAddress,quint16)), this, SLOT(checkingEmail(QString,QHostAddress,quint16)));
+    connect(this, SIGNAL(systemReceived(QByteArray)), this, SLOT(answersChecker(QByteArray)));
 
+}
+
+void Server::start(){
     std::thread sessionsCheckerThread([&](){
         while(true){
             answers.clear();
@@ -81,23 +88,17 @@ void Server::sendReceived(QByteArray message){
             list.pop_front();
         }
 
-        for(int i=0; i<sessions.size(); i++){
-            qDebug() << sessions[i].get()->IP;
+        for(int i=0; i<sessions.size(); i++)
             socket->writeDatagram(nickname.toUtf8() + finalMessage.toUtf8(), sessions[i].get()->IP, 49000);
-        }
 
         finalMessage.remove(0,1);
-        /*
         QSqlQuery query;
         query.prepare("INSERT INTO messages (Sender, Text, Time) VALUES (:sender, :text, :time)");
         query.bindValue(":sender", nickname);
         query.bindValue(":text", finalMessage);
         query.bindValue(":time", QDateTime::currentDateTime().toTime_t());
         query.exec();
-        */
     }
-    else
-        return;
 }
 
 void Server::read()
@@ -115,7 +116,6 @@ void Server::handshake(QStringList list, QHostAddress peer, quint16 port){
             return;
         }
 
-    /*
     QSqlQuery query;
     query.prepare("SELECT ID FROM users WHERE Nickname=? AND Password=?");
     query.bindValue(0, list.at(1));
@@ -126,12 +126,91 @@ void Server::handshake(QStringList list, QHostAddress peer, quint16 port){
     while (query.next())
         id = query.value(0).toString();
 
-    if(id == "")
-        return;
-        */
-    sessions.push_back(std::make_shared<Session>(Session(list.at(1), peer)));
+    if(id != ""){
+        sessions.push_back(std::make_shared<Session>(Session(list.at(1), peer)));
+        systemSocket->writeDatagram(sessions[sessions.size()-1].get()->sessionKey, peer, port);
+    }
+    else
+        systemSocket->writeDatagram("ERROR_AUTH", peer, port);
+}
 
-    systemSocket->writeDatagram(sessions[sessions.size()-1].get()->sessionKey, peer, port);
+void Server::registration(QStringList list, QHostAddress ip, quint16 port)
+{
+    QSqlQuery queryExist;
+    queryExist.prepare("SELECT ID FROM users WHERE Email=? OR Nickname=?");
+    queryExist.bindValue(0, list.at(1));
+    queryExist.bindValue(1, list.at(2));
+    queryExist.exec();
+
+    QString id="";
+    while (queryExist.next())
+        id = queryExist.value(0).toString();
+
+    if(id==""){
+        QSqlQuery query;
+        query.prepare("INSERT INTO users (Email, Nickname, Password, Date) VALUES (:email, :nickname, :password, :date)");
+        query.bindValue(":email", list.at(1));
+        query.bindValue(":nickname", list.at(2));
+        query.bindValue(":password", list.at(3));
+        query.bindValue(":date", QDateTime::currentDateTime().toTime_t());
+        query.exec();
+    }
+}
+
+void Server::recovery(QStringList list, QHostAddress ip, quint16 port)
+{
+    QSqlQuery query;
+    query.prepare("SELECT Email FROM users WHERE Email=? OR Nickname=?");
+    query.bindValue(0, list.at(1));
+    query.bindValue(1, list.at(1));
+    query.exec();
+
+    QString email="";
+    while (query.next())
+        email = query.value(0).toString();
+
+    if(email!=""){
+        //DO
+        systemSocket->writeDatagram("RECOVERYFOUND", ip, port);
+    }
+    else{
+        systemSocket->writeDatagram("RECOVERYNFOUND", ip, port);
+    }
+}
+
+void Server::checkingNickname(QString nickname, QHostAddress peer, quint16 port){
+    QSqlQuery query;
+    query.prepare("SELECT ID FROM users WHERE Nickname=?");
+    query.bindValue(0, nickname);
+
+    query.exec();
+
+    QString id="";
+    while (query.next())
+        id = query.value(0).toString();
+
+    if(id != "")
+        systemSocket->writeDatagram("NICKEXIST", peer, port);
+    else
+        systemSocket->writeDatagram("NICKNEXIST", peer, port);
+}
+
+void Server::checkingEmail(QString email, QHostAddress peer, quint16 port)
+{
+    QSqlQuery query;
+    query.prepare("SELECT ID FROM users WHERE Email=?");
+    query.bindValue(0, email);
+
+    query.exec();
+
+    QString strEmail="";
+    while (query.next())
+        strEmail = query.value(0).toString();
+
+    if(strEmail != "")
+        systemSocket->writeDatagram("EMAILEXIST", peer, port);
+    else
+        systemSocket->writeDatagram("EMAILNEXIST", peer, port);
 }
 
 void Server::answersChecker(QByteArray index){
@@ -147,8 +226,17 @@ void Server::systemReading(){
     systemSocket->readDatagram(buffer.data(), buffer.size(), &peer, &port);
 
     QStringList list = QString(buffer).split('|');
-    if(list.at(0) == "handshake")
-        emit systemReceived(list, peer, port);
+
+    if(list.at(0)=="handshake")
+        emit handshakeReceived(list, peer, port);
+    else if(list.at(0)=="registration")
+        emit registrationReceived(list, peer, port);
+    else if(list.at(0)=="recovery")
+        emit recoveryReceived(list, peer, port);
+    else if(list.at(0)=="DoesExNick")
+        emit existNicknameReceived(list.at(1), peer, port);
+    else if(list.at(0)=="DoesExEmail")
+        emit existEmailReceived(list.at(1), peer, port);
     else
         emit systemReceived(buffer);
 }

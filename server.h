@@ -1,5 +1,5 @@
-#ifndef SERVER_H
-#define SERVER_H
+#ifndef UDPSERVER_H
+#define UDPSERVER_H
 
 #include <thread>
 #include <chrono>
@@ -14,28 +14,37 @@
 
 class Server : public QObject
 {
-    Q_OBJECT
+  Q_OBJECT
 
-public:
-    explicit Server(QObject *parent = 0);
+  public:
+      explicit Server(QObject *parent = 0);
+    void start();
 
-private:
+  private:
     class Session;
     QUdpSocket *socket, *systemSocket;
     QVector<std::shared_ptr<Session>> sessions;
     QVector<short> answers;
     QString check(QByteArray sessionKey);
     bool findInAnswers(int i);
-signals:
-    void isReceived(QByteArray message);
-    void systemReceived(QStringList list, QHostAddress ip, quint16 port);
-    void systemReceived(QByteArray index);
-public slots:
-    void sendReceived(QByteArray message);
-    void read();
-    void handshake(QStringList list, QHostAddress peer, quint16 port);
-    void answersChecker(QByteArray index);
-    void systemReading();
+  signals:
+      void isReceived(QByteArray message);
+      void handshakeReceived(QStringList list, QHostAddress ip, quint16 port);
+      void registrationReceived(QStringList list, QHostAddress ip, quint16 port);
+      void recoveryReceived(QStringList list, QHostAddress ip, quint16 port);
+      void existNicknameReceived(QString nickname, QHostAddress ip, quint16 port);
+      void existEmailReceived(QString email, QHostAddress ip, quint16 port);
+      void systemReceived(QByteArray index);
+  public slots:
+      void sendReceived(QByteArray message);
+      void read();
+      void handshake(QStringList list, QHostAddress peer, quint16 port);
+      void registration(QStringList list, QHostAddress ip, quint16 port);
+      void recovery(QStringList list, QHostAddress ip, quint16 port);
+      void checkingNickname(QString nickname, QHostAddress peer, quint16 port);
+      void checkingEmail(QString email, QHostAddress peer, quint16 port);
+      void answersChecker(QByteArray index);
+      void systemReading();
 };
 
-#endif // SERVER_H
+#endif // UDPSERVER_H
