@@ -33,7 +33,10 @@ Server::Server(QObject *parent) :
     connect(this, SIGNAL(isReceived(QByteArray)), this, SLOT(sendReceived(QByteArray)));
     connect(this, SIGNAL(handshakeReceived(QStringList, QHostAddress, quint16)), this, SLOT(handshake(QStringList,QHostAddress,quint16)));
     connect(this, SIGNAL(registrationReceived(QStringList,QHostAddress,quint16)), this, SLOT(registration(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(registrationCodeReceived(QStringList,QHostAddress,quint16)), this, SLOT(registrationCode(QStringList,QHostAddress,quint16)));
     connect(this, SIGNAL(recoveryReceived(QStringList,QHostAddress,quint16)), this,SLOT(recovery(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryCodeReceived(QStringList,QHostAddress,quint16)), this, SLOT(recoveryCode(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryNewPassReceived(QString,QHostAddress,quint16)), this, SLOT(recoveryNewPass(QString,QHostAddress,quint16)));
     connect(this, SIGNAL(existNicknameReceived(QString,QHostAddress,quint16)), this, SLOT(checkingNickname(QString,QHostAddress,quint16)));
     connect(this, SIGNAL(existEmailReceived(QString,QHostAddress,quint16)), this, SLOT(checkingEmail(QString,QHostAddress,quint16)));
     connect(this, SIGNAL(systemReceived(QByteArray)), this, SLOT(answersChecker(QByteArray)));
@@ -131,7 +134,7 @@ void Server::handshake(QStringList list, QHostAddress peer, quint16 port){
         systemSocket->writeDatagram(sessions[sessions.size()-1].get()->sessionKey, peer, port);
     }
     else
-        systemSocket->writeDatagram("ERROR_AUTH", peer, port);
+        systemSocket->writeDatagram(QByteArray().append(ERROR_AUTH), peer, port);
 }
 
 void Server::registration(QStringList list, QHostAddress ip, quint16 port)
@@ -157,6 +160,10 @@ void Server::registration(QStringList list, QHostAddress ip, quint16 port)
     }
 }
 
+void Server::registrationCode(QStringList list, QHostAddress ip, quint16 port){
+
+}
+
 void Server::recovery(QStringList list, QHostAddress ip, quint16 port)
 {
     QSqlQuery query;
@@ -171,11 +178,19 @@ void Server::recovery(QStringList list, QHostAddress ip, quint16 port)
 
     if(email!=""){
         //DO
-        systemSocket->writeDatagram("RECOVERYFOUND", ip, port);
+        systemSocket->writeDatagram(QByteArray().append(RECOVERY_FOUND), ip, port);
     }
     else{
-        systemSocket->writeDatagram("RECOVERYNFOUND", ip, port);
+        systemSocket->writeDatagram(QByteArray().append(RECOVERY_NOT_FOUND), ip, port);
     }
+}
+
+void Server::recoveryCode(QStringList list, QHostAddress ip, quint16 port){
+
+}
+
+void Server::recoveryNewPass(QString pass, QHostAddress ip, quint16 port){
+
 }
 
 void Server::checkingNickname(QString nickname, QHostAddress peer, quint16 port){
@@ -190,9 +205,9 @@ void Server::checkingNickname(QString nickname, QHostAddress peer, quint16 port)
         id = query.value(0).toString();
 
     if(id != "")
-        systemSocket->writeDatagram("NICKEXIST", peer, port);
+        systemSocket->writeDatagram(QByteArray().append(NICKNAME_EXIST), peer, port);
     else
-        systemSocket->writeDatagram("NICKNEXIST", peer, port);
+        systemSocket->writeDatagram(QByteArray().append(NICKNAME_NOT_EXIST), peer, port);
 }
 
 void Server::checkingEmail(QString email, QHostAddress peer, quint16 port)
@@ -208,9 +223,9 @@ void Server::checkingEmail(QString email, QHostAddress peer, quint16 port)
         strEmail = query.value(0).toString();
 
     if(strEmail != "")
-        systemSocket->writeDatagram("EMAILEXIST", peer, port);
+        systemSocket->writeDatagram(QByteArray().append(EMAIL_EXIST), peer, port);
     else
-        systemSocket->writeDatagram("EMAILNEXIST", peer, port);
+        systemSocket->writeDatagram(QByteArray().append(EMAIL_NOT_EXIST), peer, port);
 }
 
 void Server::answersChecker(QByteArray index){
@@ -227,16 +242,22 @@ void Server::systemReading(){
 
     QStringList list = QString(buffer).split('|');
 
-    if(list.at(0)=="handshake")
+    if(list.at(0)==HANDSHAKE)
         emit handshakeReceived(list, peer, port);
-    else if(list.at(0)=="registration")
+    else if(list.at(0)==REGISTRATION)
         emit registrationReceived(list, peer, port);
-    else if(list.at(0)=="recovery")
+    else if(list.at(0)==RECOVERY)
         emit recoveryReceived(list, peer, port);
-    else if(list.at(0)=="DoesExNick")
+    else if(list.at(0)==DOES_EXIST_NICKNAME)
         emit existNicknameReceived(list.at(1), peer, port);
-    else if(list.at(0)=="DoesExEmail")
+    else if(list.at(0)==DOES_EXIST_EMAIL)
         emit existEmailReceived(list.at(1), peer, port);
+    else if(list.at(0)==REGISTRATION_CODE)
+        emit registrationCodeReceived(list, peer, port);
+    else if(list.at(0)==RECOVERY_CODE)
+        emit recoveryCodeReceived(list, peer, port);
+    else if(list.at(0)==RECOVERY_NEW_PASS)
+        emit recoveryNewPassReceived(list.at(1), peer, port);
     else
         emit systemReceived(buffer);
 }
