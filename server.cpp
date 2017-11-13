@@ -1,4 +1,5 @@
 #include "server.h"
+#include <iostream>
 using std::shared_ptr;
 
 class Server::Session{
@@ -21,6 +22,9 @@ Server::Server(QObject *parent) :
     QObject(parent)
 {
     sessions.clear();
+
+    QTime randTime(0,0,0);
+    qsrand(randTime.secsTo(QTime::currentTime()));
 
     socket = new QUdpSocket(this);
     systemSocket = new QUdpSocket(this);
@@ -137,8 +141,7 @@ void Server::handshake(QStringList list, QHostAddress peer, quint16 port){
         systemSocket->writeDatagram(QByteArray().append(ERROR_AUTH), peer, port);
 }
 
-void Server::registration(QStringList list, QHostAddress ip, quint16 port)
-{
+void Server::registration(QStringList list, QHostAddress ip, quint16 port){
     QSqlQuery queryExist;
     queryExist.prepare("SELECT ID FROM users WHERE Email=? OR Nickname=?");
     queryExist.bindValue(0, list.at(1));
@@ -148,20 +151,29 @@ void Server::registration(QStringList list, QHostAddress ip, quint16 port)
     QString id="";
     while (queryExist.next())
         id = queryExist.value(0).toString();
-
     if(id==""){
-        QSqlQuery query;
-        query.prepare("INSERT INTO users (Email, Nickname, Password, Date) VALUES (:email, :nickname, :password, :date)");
-        query.bindValue(":email", list.at(1));
-        query.bindValue(":nickname", list.at(2));
-        query.bindValue(":password", list.at(3));
-        query.bindValue(":date", QDateTime::currentDateTime().toTime_t());
-        query.exec();
+        recoveryQueue.insert(std::make_pair(list.at(1).toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
+        systemSocket->writeDatagram(QByteArray::number(EMAIL_NOT_EXIST), ip, port);
+    //DO SEND EMAIL
     }
+    else
+        systemSocket->writeDatagram(QByteArray::number(EMAIL_EXIST), ip, port);
 }
 
 void Server::registrationCode(QStringList list, QHostAddress ip, quint16 port){
-
+    if(registrationQueue.at(list.at(1).toStdString()) == list.at(2).toStdString()){
+        registrationQueue.erase(list.at(1).toStdString());
+        QSqlQuery query;
+        query.prepare("INSERT INTO users (Email, Nickname, Password, Date) VALUES (:email, :nickname, :password, :date)");
+        query.bindValue(":email", list.at(1));
+        query.bindValue(":nickname", list.at(3));
+        query.bindValue(":password", list.at(4));
+        query.bindValue(":date", QDateTime::currentDateTime().toTime_t());
+        systemSocket->writeDatagram(QByteArray::number(REGISTRATION_SUCCESSFUL), ip, port);
+        query.exec();
+    }
+    else
+        systemSocket->writeDatagram(QByteArray::number(INVALID_CODE), ip, port);
 }
 
 void Server::recovery(QStringList list, QHostAddress ip, quint16 port)

@@ -28,6 +28,7 @@ private:
     QVector<std::shared_ptr<Session>> sessions;
     QVector<short> answers;
     QString check(QByteArray sessionKey);
+    std::unordered_map<std::string, std::string> registrationQueue;
     std::unordered_map<std::string, std::string> recoveryQueue;
     bool findInAnswers(int i);
 
