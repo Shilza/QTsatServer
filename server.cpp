@@ -54,7 +54,7 @@ void Server::start(){
             unsigned int time=QDateTime::currentDateTime().toTime_t();
             for(int i=0; i<sessions.size(); i++)
                 if(time > sessions[i].get()->time+10){
-                    systemSocket->writeDatagram(QByteArray::number(i), sessions[i].get()->IP, 49002);
+                    systemSocket->writeDatagram(QByteArray::number(ACTIVITY) + "|" + QByteArray::number(i), sessions[i].get()->IP, 49002);
                 }
             std::this_thread::sleep_for(std::chrono::seconds(2));
 
@@ -152,7 +152,7 @@ void Server::registration(QStringList list, QHostAddress ip, quint16 port){
     while (queryExist.next())
         id = queryExist.value(0).toString();
     if(id==""){
-        recoveryQueue.insert(std::make_pair(list.at(1).toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
+        registrationQueue.insert(std::make_pair(list.at(1).toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
         systemSocket->writeDatagram(QByteArray::number(EMAIL_NOT_EXIST), ip, port);
     //DO SEND EMAIL
     }
@@ -176,8 +176,7 @@ void Server::registrationCode(QStringList list, QHostAddress ip, quint16 port){
         systemSocket->writeDatagram(QByteArray::number(INVALID_CODE), ip, port);
 }
 
-void Server::recovery(QStringList list, QHostAddress ip, quint16 port)
-{
+void Server::recovery(QStringList list, QHostAddress ip, quint16 port){
     QSqlQuery query;
     query.prepare("SELECT Email FROM users WHERE Email=? OR Nickname=?");
     query.bindValue(0, list.at(1));
@@ -189,16 +188,32 @@ void Server::recovery(QStringList list, QHostAddress ip, quint16 port)
         email = query.value(0).toString();
 
     if(email!=""){
-        //DO
-        systemSocket->writeDatagram(QByteArray().append(RECOVERY_FOUND), ip, port);
+        //DO SEND EMAIL
+        recoveryQueue.insert(std::make_pair(email.toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
+        systemSocket->writeDatagram(QByteArray::number(RECOVERY_FOUND), ip, port);
     }
-    else{
+    else
         systemSocket->writeDatagram(QByteArray().append(RECOVERY_NOT_FOUND), ip, port);
-    }
 }
 
 void Server::recoveryCode(QStringList list, QHostAddress ip, quint16 port){
+    QSqlQuery queryEmail;
+    queryEmail.prepare("SELECT Email FROM users WHERE Email=? OR Nickname=?");
+    queryEmail.bindValue(0, list.at(1));
+    queryEmail.bindValue(1, list.at(1));
+    queryEmail.exec();
 
+    QString email="";
+    while (queryEmail.next())
+        email = queryEmail.value(0).toString();
+
+    if(recoveryQueue.at(email.toStdString()) == list.at(2).toStdString()){
+        recoveryQueue.erase(email.toStdString());
+        recoveryQueue.insert(std::make_pair(email.toStdString(), std::to_string(EMAIL_IS_CONFIRMED)));
+        systemSocket->writeDatagram(QByteArray::number(RIGHT_CODE), ip, port);
+    }
+    else
+        systemSocket->writeDatagram(QByteArray::number(INVALID_CODE), ip, port);
 }
 
 void Server::recoveryNewPass(QString pass, QHostAddress ip, quint16 port){
@@ -266,10 +281,10 @@ void Server::systemReading(){
         emit existEmailReceived(list.at(1), peer, port);
     else if(list.at(0)==REGISTRATION_CODE)
         emit registrationCodeReceived(list, peer, port);
-    else if(list.at(0)==RECOVERY_CODE)
+    else if(list.at(0)==RECOVERY_CODE && list.at(2).length()==6)
         emit recoveryCodeReceived(list, peer, port);
     else if(list.at(0)==RECOVERY_NEW_PASS)
         emit recoveryNewPassReceived(list.at(1), peer, port);
-    else
-        emit systemReceived(buffer);
+    else if(list.at(0)==ACTIVITY)
+        emit systemReceived(QByteArray::fromStdString(list.at(1).toStdString()));
 }
