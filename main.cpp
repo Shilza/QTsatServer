@@ -2,6 +2,7 @@
 #include <QCoreApplication>
 #include "server.h"
 #include "def.h"
+#include <QFile>
 
 int main(int argc, char *argv[])
 {
@@ -17,5 +18,7 @@ int main(int argc, char *argv[])
 */
     Server server;
     server.start();
+
     return application.exec();
+
 }

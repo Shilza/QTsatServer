@@ -26,7 +26,7 @@ private:
     class Session;
     QUdpSocket *socket, *systemSocket;
     QVector<std::shared_ptr<Session>> sessions;
-    QVector<short> answers;
+    QVector<quint32> answers;
     QString check(QByteArray sessionKey);
     std::unordered_map<std::string, std::string> registrationQueue;
     std::unordered_map<std::string, std::string> recoveryQueue;
@@ -41,7 +41,7 @@ signals:
     void existEmailReceived(QString email, QHostAddress ip, quint16 port);
     void registrationCodeReceived(QStringList list, QHostAddress ip, quint16 port);
     void recoveryCodeReceived(QStringList list, QHostAddress ip, quint16 port);
-    void recoveryNewPassReceived(QString pass, QHostAddress ip, quint16 port);
+    void recoveryNewPassReceived(QStringList list, QHostAddress ip, quint16 port);
     void systemReceived(QByteArray index);
 
 public slots:
@@ -52,7 +52,7 @@ public slots:
     void registrationCode(QStringList list, QHostAddress ip, quint16 port);
     void recovery(QStringList list, QHostAddress ip, quint16 port);
     void recoveryCode(QStringList list, QHostAddress ip, quint16 port);
-    void recoveryNewPass(QString pass, QHostAddress ip, quint16 port);
+    void recoveryNewPass(QStringList list, QHostAddress ip, quint16 port);
     void checkingNickname(QString nickname, QHostAddress peer, quint16 port);
     void checkingEmail(QString email, QHostAddress peer, quint16 port);
     void answersChecker(QByteArray index);
