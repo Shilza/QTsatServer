@@ -152,7 +152,7 @@ void Server::registration(QStringList list, QHostAddress ip, quint16 port){
     while (queryExist.next())
         id = queryExist.value(0).toString();
     if(id==""){
-        registrationQueue.insert(std::make_pair(list.at(1).toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
+        registrationQueue.insert(list.at(1), QString().append(QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex()).mid(0,6));
         systemSocket->writeDatagram(QByteArray::number(EMAIL_NOT_EXIST), ip, port);
     //DO SEND EMAIL
     }
@@ -161,8 +161,8 @@ void Server::registration(QStringList list, QHostAddress ip, quint16 port){
 }
 
 void Server::registrationCode(QStringList list, QHostAddress ip, quint16 port){
-    if(registrationQueue.at(list.at(1).toStdString()) == list.at(2).toStdString()){
-        registrationQueue.erase(list.at(1).toStdString());
+    if(registrationQueue.value(list.at(1)) == list.at(2)){
+        registrationQueue.erase(registrationQueue.find(list.at(1)));
         QSqlQuery query;
         query.prepare("INSERT INTO users (Email, Nickname, Password, Date) VALUES (:email, :nickname, :password, :date)");
         query.bindValue(":email", list.at(1));
@@ -189,7 +189,7 @@ void Server::recovery(QStringList list, QHostAddress ip, quint16 port){
 
     if(email!=""){
         //DO SEND EMAIL
-        recoveryQueue.insert(std::make_pair(email.toStdString(), QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex().toStdString().substr(0,6)));
+        recoveryQueue.insert(email, QString().append(QCryptographicHash::hash(QByteArray::number(qrand()) + QByteArray::number(QDateTime::currentDateTime().toTime_t()), QCryptographicHash::Md5).toHex()).mid(0,6));
         systemSocket->writeDatagram(QByteArray::number(RECOVERY_FOUND), ip, port);
     }
     else
@@ -207,9 +207,8 @@ void Server::recoveryCode(QStringList list, QHostAddress ip, quint16 port){
     while (queryEmail.next())
         email = queryEmail.value(0).toString();
 
-    if(recoveryQueue.at(email.toStdString()) == list.at(2).toStdString()){
-        recoveryQueue.erase(email.toStdString());
-        recoveryQueue.insert(std::make_pair(email.toStdString(), EMAIL_IS_CONFIRMED));
+    if(recoveryQueue.value(email) == list.at(2)){
+        recoveryQueue.insert(email, EMAIL_IS_CONFIRMED);
         systemSocket->writeDatagram(QByteArray::number(RIGHT_CODE), ip, port);
     }
     else
@@ -227,7 +226,8 @@ void Server::recoveryNewPass(QStringList list, QHostAddress ip, quint16 port){
     while (queryEmail.next())
         email = queryEmail.value(0).toString();
 
-    if(recoveryQueue.at(email.toStdString()) == EMAIL_IS_CONFIRMED){
+    if(recoveryQueue.value(email) == EMAIL_IS_CONFIRMED){
+        recoveryQueue.erase(recoveryQueue.find(email));
         QSqlQuery query;
         query.prepare("UPDATE users SET Password=? WHERE Email=? VALUES (:password, :email)");
         query.bindValue(":email", email);

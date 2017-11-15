@@ -10,7 +10,6 @@
 #include <QDateTime>
 #include <QUdpSocket>
 #include <QStringList>
-#include <unordered_map>
 #include <QCryptographicHash>
 #include "def.h"
 
@@ -28,8 +27,8 @@ private:
     QVector<std::shared_ptr<Session>> sessions;
     QVector<quint32> answers;
     QString check(QByteArray sessionKey);
-    std::unordered_map<std::string, std::string> registrationQueue;
-    std::unordered_map<std::string, std::string> recoveryQueue;
+    QHash<QString, QString> registrationQueue;
+    QHash<QString, QString> recoveryQueue;
     bool findInAnswers(int i);
 
 signals:
