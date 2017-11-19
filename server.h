@@ -23,13 +23,17 @@ public:
 
 private:
     class Session;
+
     QUdpSocket *socket, *systemSocket;
+
     QVector<std::shared_ptr<Session>> sessions;
     QVector<quint32> answers;
-    QString check(QByteArray sessionKey);
+
     QHash<QString, QString> registrationQueue;
     QHash<QString, QString> recoveryQueue;
-    bool findInAnswers(int i);
+
+    QString check(QByteArray sessionKey);
+    bool findInAnswers(quint32 i);
 
 signals:
     void isReceived(QByteArray message);
@@ -46,6 +50,7 @@ signals:
 public slots:
     void sendReceived(QByteArray message);
     void read();
+
     void handshake(QStringList list, QHostAddress peer, quint16 port);
     void registration(QStringList list, QHostAddress ip, quint16 port);
     void registrationCode(QStringList list, QHostAddress ip, quint16 port);
@@ -54,6 +59,7 @@ public slots:
     void recoveryNewPass(QStringList list, QHostAddress ip, quint16 port);
     void checkingNickname(QString nickname, QHostAddress peer, quint16 port);
     void checkingEmail(QString email, QHostAddress peer, quint16 port);
+
     void answersChecker(QByteArray index);
     void systemReading();
 };

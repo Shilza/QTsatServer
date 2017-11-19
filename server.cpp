@@ -29,21 +29,21 @@ Server::Server(QObject *parent) :
     socket = new QUdpSocket(this);
     systemSocket = new QUdpSocket(this);
 
-    socket->bind(QHostAddress::Any, 49001);
-    systemSocket->bind(QHostAddress::Any, 49003);
+    socket->bind(QHostAddress::Any, IN_PORT);
+    systemSocket->bind(QHostAddress::Any, SYSTEM_IN_PORT);
 
     connect(socket, SIGNAL(readyRead()), this, SLOT(read()));
     connect(systemSocket, SIGNAL(readyRead()), this, SLOT(systemReading()));
-    connect(this, SIGNAL(isReceived(QByteArray)), this, SLOT(sendReceived(QByteArray)));
-    connect(this, SIGNAL(handshakeReceived(QStringList, QHostAddress, quint16)), this, SLOT(handshake(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(registrationReceived(QStringList,QHostAddress,quint16)), this, SLOT(registration(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(registrationCodeReceived(QStringList,QHostAddress,quint16)), this, SLOT(registrationCode(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(recoveryReceived(QStringList,QHostAddress,quint16)), this,SLOT(recovery(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(recoveryCodeReceived(QStringList,QHostAddress,quint16)), this, SLOT(recoveryCode(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(recoveryNewPassReceived(QStringList,QHostAddress,quint16)), this, SLOT(recoveryNewPass(QStringList,QHostAddress,quint16)));
-    connect(this, SIGNAL(existNicknameReceived(QString,QHostAddress,quint16)), this, SLOT(checkingNickname(QString,QHostAddress,quint16)));
-    connect(this, SIGNAL(existEmailReceived(QString,QHostAddress,quint16)), this, SLOT(checkingEmail(QString,QHostAddress,quint16)));
-    connect(this, SIGNAL(systemReceived(QByteArray)), this, SLOT(answersChecker(QByteArray)));
+    connect(this, SIGNAL(isReceived(QByteArray)), SLOT(sendReceived(QByteArray)));
+    connect(this, SIGNAL(handshakeReceived(QStringList, QHostAddress, quint16)), SLOT(handshake(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(registrationReceived(QStringList,QHostAddress,quint16)), SLOT(registration(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(registrationCodeReceived(QStringList,QHostAddress,quint16)), SLOT(registrationCode(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryReceived(QStringList,QHostAddress,quint16)), SLOT(recovery(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryCodeReceived(QStringList,QHostAddress,quint16)), SLOT(recoveryCode(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(recoveryNewPassReceived(QStringList,QHostAddress,quint16)), SLOT(recoveryNewPass(QStringList,QHostAddress,quint16)));
+    connect(this, SIGNAL(existNicknameReceived(QString,QHostAddress,quint16)), SLOT(checkingNickname(QString,QHostAddress,quint16)));
+    connect(this, SIGNAL(existEmailReceived(QString,QHostAddress,quint16)), SLOT(checkingEmail(QString,QHostAddress,quint16)));
+    connect(this, SIGNAL(systemReceived(QByteArray)), SLOT(answersChecker(QByteArray)));
 
 }
 
@@ -54,7 +54,7 @@ void Server::start(){
             unsigned int time=QDateTime::currentDateTime().toTime_t();
             for(int i=0; i<sessions.size(); i++)
                 if(time > sessions[i].get()->time+300){
-                    systemSocket->writeDatagram(QByteArray::number(ACTIVITY) + "|" + QByteArray::number(i), sessions[i].get()->IP, 49002);
+                    systemSocket->writeDatagram(QByteArray::number(ACTIVITY) + "|" + QByteArray::number(i), sessions[i].get()->IP, SYSTEM_OUT_PORT);
                 }
             std::this_thread::sleep_for(std::chrono::seconds(2));
 
@@ -74,7 +74,7 @@ QString Server::check(QByteArray sessionKey){
     return "";
 }
 
-bool Server::findInAnswers(int i){
+bool Server::findInAnswers(quint32 i){
     for(int j=0; j<answers.size(); j++)
         if(answers[j] == i){
             answers.erase(answers.begin()+j);
@@ -96,7 +96,7 @@ void Server::sendReceived(QByteArray message){
         }
 
         for(int i=0; i<sessions.size(); i++)
-            socket->writeDatagram(nickname.toUtf8() + finalMessage.toUtf8(), sessions[i].get()->IP, 49000);
+            socket->writeDatagram(nickname.toUtf8() + finalMessage.toUtf8(), sessions[i].get()->IP, OUT_PORT);
 
         finalMessage.remove(0,1);
         QSqlQuery query;
